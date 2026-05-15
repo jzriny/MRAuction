@@ -619,7 +619,7 @@
       <div class="status-dot disconnected" id="status-dot"></div>
       <span id="status-text">Connecting...</span>
     </div>
-    <span>Starting Balance: <span id="footer-balance">$10,000</span> · Bid Increment: <span id="footer-increment">$100</span></span>
+    <span>Starting Balance: <span id="footer-balance">$10,000</span> · Bid Increment: <span id="footer-increment">$100</span> · Duration: <span id="footer-duration">30s</span> · Extender: <span id="footer-extender">10s</span></span>
   </div>
 </div>
 
@@ -685,6 +685,8 @@ function renderRoom() {
   if (roomState.settings) {
     document.getElementById('footer-balance').textContent = '$' + roomState.settings.starting_balance.toLocaleString();
     document.getElementById('footer-increment').textContent = '$' + roomState.settings.bid_increment.toLocaleString();
+    document.getElementById('footer-duration').textContent = roomState.settings.auction_duration + 's';
+    document.getElementById('footer-extender').textContent = roomState.settings.time_extender + 's';
   }
   const toggle = document.getElementById('host-toggle-btn');
   if (MY_USERNAME === roomState.host) {
@@ -944,7 +946,7 @@ function renderHostPanel() {
     hostSafeMap[safe] = name;
     html += `
       <div class="host-section">
-        <div class="host-section-header">${esc(name)}${isMe ? ' <span style="color:var(--muted);font-size:0.75rem">(you)</span>' : ''} — $${pdata.balance.toLocaleString()}</div>
+        <div class="host-section-header">${esc(name)}${isMe ? ' <span style="color:var(--muted);font-size:0.75rem">(you)</span>' : ''} — $${pdata.balance.toLocaleString()}${!isMe && name !== roomState.host ? ` <button class="host-btn sm" style="margin-left:auto;color:var(--red);border-color:var(--red)" onclick="hostRemovePlayer('${safe}')">Remove</button>` : ''}</div>
         <div class="host-row">
           <label>Balance</label>
           <input type="number" id="bal-${safe}" value="100" min="1" step="100" />
@@ -996,6 +998,11 @@ function hostAddCharacter(safe) {
 
 function hostRemoveCharacter(safe, index) {
   sendAction('host_remove_character', { target: hostSafeMap[safe] || safe, index });
+}
+
+function hostRemovePlayer(safe) {
+  if (!confirm('Remove ' + (hostSafeMap[safe] || safe) + ' from the game?')) return;
+  sendAction('host_remove_player', { target: hostSafeMap[safe] || safe });
 }
 
 function hostStartAuction() {

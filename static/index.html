@@ -280,6 +280,16 @@
           <input type="number" id="setting-increment" value="100" min="10" step="10" />
         </div>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem">
+        <div class="input-group" style="margin-bottom:0">
+          <label>Auction Duration (s)</label>
+          <input type="number" id="setting-duration" value="30" min="10" max="300" step="5" />
+        </div>
+        <div class="input-group" style="margin-bottom:0">
+          <label>Time Extender (s)</label>
+          <input type="number" id="setting-extender" value="10" min="0" max="60" step="1" />
+        </div>
+      </div>
       <div class="input-group" style="margin-bottom:0">
         <label>Max Players</label>
         <input type="number" id="setting-maxplayers" value="20" min="2" max="100" step="1" />
@@ -334,10 +344,12 @@ async function enterRoom() {
       const startingBalance = parseInt(document.getElementById('setting-balance').value) || 10000;
       const bidIncrement = parseInt(document.getElementById('setting-increment').value) || 100;
       const maxPlayers = parseInt(document.getElementById('setting-maxplayers').value) || 20;
+      const auctionDuration = parseInt(document.getElementById('setting-duration').value) || 30;
+      const timeExtender = parseInt(document.getElementById('setting-extender').value) || 10;
       const res = await fetch('/api/create-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, starting_balance: startingBalance, bid_increment: bidIncrement, max_players: maxPlayers }),
+        body: JSON.stringify({ username, starting_balance: startingBalance, bid_increment: bidIncrement, max_players: maxPlayers, auction_duration: auctionDuration, time_extender: timeExtender }),
       });
       if (!res.ok) throw new Error((await res.json()).detail || 'Failed to create room');
       data = await res.json();
