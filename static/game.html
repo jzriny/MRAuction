@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marvel Rivals Auction House</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #e3000f;
+    --gold: #ffd700;
+    --gold-dim: #b8960a;
+    --dark: #0a0a0f;
+    --dark2: #111118;
+    --dark3: #1a1a24;
+    --panel: #13131d;
+    --border: #2a2a3d;
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --green: #00e676;
+    --blue: #2979ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--dark);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999; opacity: 0.4;
+  }
+
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none; z-index: 9998;
+  }
+
+  #screen-room {
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto auto;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .room-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .room-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    color: var(--gold);
+    letter-spacing: 0.1em;
+  }
+
+  .room-code-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    background: var(--dark2);
+    border: 1px solid var(--border);
+    padding: 0.25rem 0.75rem;
+    border-radius: 2px;
+    color: var(--muted);
+  }
+  .room-code-badge span { color: var(--gold); font-weight: bold; letter-spacing: 0.1em; }
+
+  .player-badge {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .player-badge span { color: var(--green); }
+
+  .room-main {
+    display: grid;
+    grid-template-columns: 280px 1fr 280px;
+    gap: 1rem;
+  }
+
+  @media (max-width: 900px) {
+    .room-main { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.25rem;
+  }
+
+  .panel-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.6rem;
+    margin-bottom: 1rem;
+  }
+
+  .player-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.5rem;
+    border-radius: 3px;
+    margin-bottom: 0.3rem;
+    transition: background 0.2s;
+    gap: 0.5rem;
+  }
+  .player-item:hover { background: var(--dark2); }
+  .player-item.is-you { background: rgba(227,0,15,0.07); border-left: 2px solid var(--red); padding-left: calc(0.5rem - 2px); }
+  .player-item.offline { opacity: 0.45; }
+
+  .player-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .player-crown { color: var(--gold); margin-right: 3px; font-size: 0.8rem; }
+
+  .player-balance {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--gold);
+    white-space: nowrap;
+  }
+
+  .player-chars {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.offline { background: var(--muted); }
+
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    min-height: 400px;
+  }
+
+  .lobby-state { text-align: center; }
+  .lobby-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.5rem;
+    letter-spacing: 0.1em;
+    color: var(--gold);
+  }
+  .lobby-sub { color: var(--muted); font-size: 1rem; margin-top: 0.5rem; }
+
+  .btn-spin {
+    padding: 1rem 3rem;
+    background: linear-gradient(135deg, var(--red), #8b0000);
+    border: none;
+    border-radius: 3px;
+    color: #fff;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(227,0,15,0.4);
+  }
+  .btn-spin:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(227,0,15,0.5); }
+  .btn-spin:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .auction-card {
+    background: var(--dark2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+    text-align: center;
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .auction-char-emoji { font-size: 4rem; margin-bottom: 0.5rem; display: block; }
+
+  .auction-char-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 1rem;
+  }
+
+  .bid-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .bid-info-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.6rem;
+    text-align: center;
+  }
+  .bid-info-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .bid-info-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.1rem;
+    color: var(--gold);
+    margin-top: 0.2rem;
+  }
+  .bid-info-value.red { color: var(--red); }
+  .bid-info-value.green { color: var(--green); }
+
+  .timer-bar-wrap {
+    height: 6px;
+    background: var(--dark);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+  .timer-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--red), var(--gold));
+    border-radius: 3px;
+    transition: width 0.5s linear, background 0.5s;
+  }
+  .timer-bar.urgent { background: var(--red); animation: urgentFlash 0.5s ease-in-out infinite alternate; }
+  @keyframes urgentFlash { from { opacity: 1; } to { opacity: 0.5; } }
+
+  .bid-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .bid-btn {
+    padding: 0.6rem 0.4rem;
+    background: rgba(227,0,15,0.1);
+    border: 1px solid rgba(227,0,15,0.3);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .bid-btn:hover { background: rgba(227,0,15,0.25); border-color: var(--red); color: #fff; }
+  .bid-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .custom-bid-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .custom-bid-input {
+    flex: 1;
+    background: var(--dark);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    padding: 0.5rem 0.75rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .custom-bid-input:focus { border-color: var(--red); }
+
+  .bid-submit {
+    padding: 0.5rem 1.2rem;
+    background: var(--red);
+    border: none;
+    border-radius: 3px;
+    color: #fff;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .bid-submit:hover { background: #ff1a26; box-shadow: 0 0 15px rgba(227,0,15,0.4); }
+  .bid-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .sold-card {
+    text-align: center;
+    padding: 2rem;
+  }
+  .sold-banner {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem;
+    letter-spacing: 0.15em;
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(255,215,0,0.5);
+    animation: soldPulse 1s ease-in-out infinite alternate;
+  }
+  @keyframes soldPulse {
+    from { text-shadow: 0 0 20px rgba(255,215,0,0.4); }
+    to { text-shadow: 0 0 50px rgba(255,215,0,0.8); }
+  }
+
+  .log-scroll {
+    max-height: 300px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .log-scroll::-webkit-scrollbar { width: 4px; }
+  .log-scroll::-webkit-scrollbar-track { background: transparent; }
+  .log-scroll::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .log-entry {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 2px;
+    margin-bottom: 0.2rem;
+    animation: logFade 0.3s ease;
+    color: var(--muted);
+  }
+  @keyframes logFade { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+  .log-entry.important { color: var(--text); background: rgba(255,215,0,0.05); }
+
+  .char-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 2px;
+    margin: 0.15rem;
+    background: rgba(227,0,15,0.12);
+    color: #ff5252;
+  }
+
+  .roster-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  .roster-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .roster-table th, .roster-table td {
+    padding: 0.5rem 0.75rem;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+  .roster-table th {
+    background: var(--dark2);
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.1em;
+    color: var(--gold);
+    font-weight: 400;
+    font-size: 0.95rem;
+  }
+  .roster-table th .roster-balance {
+    display: block;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--gold);
+    font-size: 0.75rem;
+    letter-spacing: 0;
+    margin-top: 2px;
+  }
+  .roster-table td {
+    color: var(--text);
+    font-weight: 600;
+    vertical-align: top;
+  }
+  .roster-table td .roster-paid {
+    display: block;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 400;
+  }
+  .roster-table td.empty {
+    color: var(--muted);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 0.75rem;
+  }
+
+  #toast-container {
+    position: fixed;
+    bottom: 2rem; right: 2rem;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 360px;
+  }
+  .toast {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold);
+    border-radius: 3px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+  @keyframes toastOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(20px); } }
+
+  .room-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .connection-status { display: flex; align-items: center; gap: 0.4rem; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .status-dot.disconnected { background: var(--red); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .spectator-notice {
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-align: center;
+    font-style: italic;
+  }
+
+  .host-toggle-btn {
+    background: var(--dark2);
+    border: 1px solid var(--gold-dim);
+    border-radius: 3px;
+    color: var(--gold);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .host-toggle-btn:hover { background: var(--panel); border-color: var(--gold); }
+
+  .host-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem;
+  }
+  .host-panel .panel-title { margin-bottom: 0; }
+
+  .host-section {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  .host-section:first-of-type { margin-top: 0.75rem; }
+
+  .host-section-header {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--gold);
+    margin-bottom: 0.5rem;
+  }
+
+  .host-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .host-row label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    min-width: 70px;
+  }
+  .host-row input {
+    background: var(--dark2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    padding: 0.35rem 0.5rem;
+    outline: none;
+    width: 120px;
+    transition: border-color 0.2s;
+  }
+  .host-row input:focus { border-color: var(--red); }
+
+  .host-btn {
+    padding: 0.3rem 0.7rem;
+    background: rgba(227,0,15,0.1);
+    border: 1px solid rgba(227,0,15,0.3);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .host-btn:hover { background: rgba(227,0,15,0.25); border-color: var(--red); color: #fff; }
+  .host-btn.green { background: rgba(0,230,118,0.1); border-color: rgba(0,230,118,0.3); }
+  .host-btn.green:hover { background: rgba(0,230,118,0.25); border-color: var(--green); color: var(--green); }
+  .host-btn.sm { padding: 0.15rem 0.4rem; font-size: 0.7rem; }
+
+  .host-char-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.2rem 0.4rem;
+    border-radius: 2px;
+    margin: 0.15rem;
+    background: rgba(227,0,15,0.12);
+    color: #ff5252;
+  }
+</style>
+</head>
+<body>
+
+<div id="screen-room">
+  <div class="room-header">
+    <div class="room-title">🔨 Auction House</div>
+    <div class="room-code-badge">ROOM: <span id="header-room-code">------</span></div>
+    <div class="player-badge">Signed in as <span id="header-username">-</span></div>
+    <button id="host-toggle-btn" class="host-toggle-btn" onclick="toggleHostPanel()" style="display:none">🛠️ Host</button>
+  </div>
+
+  <div class="room-main">
+    <div class="panel">
+      <div class="panel-title">⚡ Players</div>
+      <div id="players-list"></div>
+    </div>
+
+    <div class="panel stage" id="stage-area">
+      <div class="lobby-state">
+        <div class="lobby-title">Connecting...</div>
+        <div class="lobby-sub">Getting things ready</div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+      <div class="panel" style="flex:1">
+        <div class="panel-title">📋 Bid Log</div>
+        <div class="log-scroll" id="bid-log"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">🃏 Your Characters</div>
+        <div id="my-characters" style="font-size:0.8rem;color:var(--muted)">None yet</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="roster-wrap">
+    <div class="panel-title">🏆 Roster</div>
+    <table class="roster-table" id="roster-table">
+      <tbody><tr><td style="color:var(--muted);text-align:center;padding:1rem">Waiting for players...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div id="host-panel" class="host-panel" style="display:none">
+    <div class="panel-title">🛠️ Host Controls</div>
+    <div id="host-controls-content"></div>
+  </div>
+
+  <div class="room-footer">
+    <div class="connection-status">
+      <div class="status-dot disconnected" id="status-dot"></div>
+      <span id="status-text">Connecting...</span>
+    </div>
+    <span>Starting Balance: <span id="footer-balance">$10,000</span> · Bid Increment: <span id="footer-increment">$100</span></span>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const MY_USERNAME = params.get('user');
+const ROOM_CODE = params.get('room');
+
+if (!MY_USERNAME || !ROOM_CODE) {
+  document.getElementById('stage-area').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--red)">Missing login info. <a href="/" style="color:var(--gold)">Go back</a></div>';
+}
+
+let ws = null;
+let roomState = null;
+let timerInterval = null;
+
+document.getElementById('header-room-code').textContent = ROOM_CODE;
+document.getElementById('header-username').textContent = MY_USERNAME;
+
+connectWS();
+
+function connectWS() {
+  const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${wsProto}://${location.host}/ws/${ROOM_CODE}/${MY_USERNAME}`);
+
+  ws.onopen = () => setStatus(true);
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handleWS(msg);
+  };
+  ws.onclose = () => {
+    setStatus(false);
+    setTimeout(connectWS, 3000);
+  };
+  ws.onerror = () => ws.close();
+}
+
+function setStatus(connected) {
+  document.getElementById('status-dot').className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+  document.getElementById('status-text').textContent = connected ? `Connected · ${ROOM_CODE}` : 'Reconnecting...';
+}
+
+function handleWS(msg) {
+  if (msg.type === 'state_update') {
+    roomState = msg.room;
+    renderRoom();
+    if (msg.toast) showToast(msg.toast);
+  } else if (msg.type === 'error') {
+    showToast('⚠️ ' + msg.message, true);
+  }
+}
+
+function sendAction(action, extra = {}) {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ action, ...extra }));
+  }
+}
+
+function renderRoom() {
+  if (!roomState) return;
+  if (roomState.settings) {
+    document.getElementById('footer-balance').textContent = '$' + roomState.settings.starting_balance.toLocaleString();
+    document.getElementById('footer-increment').textContent = '$' + roomState.settings.bid_increment.toLocaleString();
+  }
+  const toggle = document.getElementById('host-toggle-btn');
+  if (MY_USERNAME === roomState.host) {
+    toggle.style.display = '';
+  } else {
+    toggle.style.display = 'none';
+  }
+  renderPlayers();
+  renderStage();
+  renderLog();
+  renderMyChars();
+  renderRosterTable();
+  if (document.getElementById('host-panel').style.display !== 'none') {
+    renderHostPanel();
+  }
+}
+
+function renderPlayers() {
+  const isHost = MY_USERNAME === roomState.host;
+  const list = document.getElementById('players-list');
+  list.innerHTML = '';
+
+  for (const [name, pdata] of Object.entries(roomState.players)) {
+    const div = document.createElement('div');
+    div.className = 'player-item' +
+      (name === MY_USERNAME ? ' is-you' : '') +
+      (!pdata.connected ? ' offline' : '');
+
+    const crown = name === roomState.host ? '<span class="player-crown">👑</span>' : '';
+    const charCount = pdata.characters?.length || 0;
+
+    div.innerHTML = `
+      <div class="dot ${pdata.connected ? 'online' : 'offline'}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="player-name">${crown}${esc(name)}${name === MY_USERNAME ? ' <span style="color:var(--muted);font-size:0.7rem">(you)</span>' : ''}</div>
+        ${charCount > 0 ? `<div class="player-chars">${charCount} character${charCount !== 1 ? 's' : ''}</div>` : ''}
+      </div>
+      <div class="player-balance">$${pdata.balance.toLocaleString()}</div>
+    `;
+    list.appendChild(div);
+  }
+}
+
+function renderStage() {
+  const stage = document.getElementById('stage-area');
+  const state = roomState.state;
+  const isHost = MY_USERNAME === roomState.host;
+
+  if (state === 'lobby') {
+    stage.innerHTML = `
+      <div class="lobby-state" style="text-align:center">
+        <div class="lobby-title">🔨 Ready to Bid</div>
+        <div class="lobby-sub" style="margin-bottom:1.5rem">Room Code: <strong style="color:var(--gold);letter-spacing:0.15em">${ROOM_CODE}</strong> — Share with friends!</div>
+        ${isHost ? `
+          <div style="display:flex;gap:0.5rem;max-width:420px;margin:1rem auto 0">
+            <input type="text" id="character-name-input" placeholder="Enter character name..." maxlength="50" onkeydown="if(event.key==='Enter')hostStartAuction()" style="flex:1;background:var(--dark2);border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:'Rajdhani',sans-serif;font-size:1rem;padding:0.7rem 1rem;outline:none" />
+            <button class="btn-spin" onclick="hostStartAuction()" style="font-size:1.2rem;padding:0.7rem 1.5rem">START AUCTION</button>
+          </div>
+        ` : '<div class="spectator-notice" style="margin-top:1rem">Waiting for host to start an auction...</div>'}
+      </div>
+    `;
+  }
+
+  else if (state === 'bidding') {
+    renderBidding(stage);
+  }
+
+  else if (state === 'sold') {
+    renderSold(stage, isHost);
+  }
+}
+
+function renderBidding(stage) {
+  const a = roomState.auction;
+  if (!a) return;
+
+  const me = roomState.players[MY_USERNAME];
+  const bidInc = roomState.settings?.bid_increment || 100;
+  const minBid = (a.current_bid || 0) + bidInc;
+  const endTime = a.end_time;
+  const now = Date.now() / 1000;
+  const remaining = Math.max(0, endTime - now);
+  const pct = (remaining / 30) * 100;
+  const isLeader = a.current_bidder === MY_USERNAME;
+  const canAfford = me.balance >= minBid;
+
+  stage.innerHTML = `
+    <div class="auction-card">
+      <span class="auction-char-emoji">${a.character?.img || '❓'}</span>
+      <div class="auction-char-name">${esc(a.character?.name || '')}</div>
+
+      <div class="timer-bar-wrap">
+        <div class="timer-bar ${remaining < 10 ? 'urgent' : ''}" id="timer-bar" style="width:${pct}%"></div>
+      </div>
+
+      <div class="bid-row">
+        <div class="bid-info-box">
+          <div class="bid-info-label">Current Bid</div>
+          <div class="bid-info-value ${a.current_bid > 0 ? '' : ''}">${a.current_bid > 0 ? '$' + a.current_bid.toLocaleString() : '—'}</div>
+        </div>
+        <div class="bid-info-box">
+          <div class="bid-info-label">Leader</div>
+          <div class="bid-info-value ${isLeader ? 'green' : 'red'}">${a.current_bidder ? esc(a.current_bidder) : 'None'}</div>
+        </div>
+        <div class="bid-info-box">
+          <div class="bid-info-label">Time Left</div>
+          <div class="bid-info-value ${remaining < 10 ? 'red' : ''}" id="timer-text">${Math.ceil(remaining)}s</div>
+        </div>
+        <div class="bid-info-box">
+          <div class="bid-info-label">Your Balance</div>
+          <div class="bid-info-value">$${me.balance.toLocaleString()}</div>
+        </div>
+      </div>
+
+      <div class="bid-controls">
+        <button class="bid-btn" onclick="quickBid(${minBid})" ${!canAfford ? 'disabled' : ''}>+$${bidInc.toLocaleString()}<br><span style="font-size:0.75rem;opacity:0.7">$${minBid.toLocaleString()}</span></button>
+        <button class="bid-btn" onclick="quickBid(${a.current_bid + 500})" ${me.balance < a.current_bid + 500 ? 'disabled' : ''}>+$500<br><span style="font-size:0.75rem;opacity:0.7">$${(a.current_bid + 500).toLocaleString()}</span></button>
+        <button class="bid-btn" onclick="quickBid(${a.current_bid + 1000})" ${me.balance < a.current_bid + 1000 ? 'disabled' : ''}>+$1K<br><span style="font-size:0.75rem;opacity:0.7">$${(a.current_bid + 1000).toLocaleString()}</span></button>
+      </div>
+
+      <div class="custom-bid-row">
+        <input class="custom-bid-input" type="number" id="custom-bid" placeholder="Custom bid..." min="${minBid}" step="${bidInc}" />
+        <button class="bid-submit" onclick="submitCustomBid()" ${!canAfford ? 'disabled' : ''}>BID</button>
+      </div>
+
+      ${isLeader ? '<div style="color:var(--green);font-size:0.85rem;font-weight:700;margin-top:0.5rem">✅ You are the highest bidder!</div>' : ''}
+    </div>
+  `;
+
+  startTimer(endTime);
+}
+
+function startTimer(endTime) {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    const now = Date.now() / 1000;
+    const remaining = Math.max(0, endTime - now);
+    const pct = (remaining / 30) * 100;
+
+    const bar = document.getElementById('timer-bar');
+    const text = document.getElementById('timer-text');
+    if (bar) {
+      bar.style.width = pct + '%';
+      bar.className = 'timer-bar' + (remaining < 10 ? ' urgent' : '');
+    }
+    if (text) {
+      text.textContent = Math.ceil(remaining) + 's';
+      text.className = 'bid-info-value' + (remaining < 10 ? ' red' : '');
+    }
+
+    if (remaining <= 0) clearInterval(timerInterval);
+  }, 200);
+}
+
+function renderSold(stage, isHost) {
+  const a = roomState.auction;
+  stage.innerHTML = `
+    <div class="sold-card">
+      <div class="sold-banner">🔨 SOLD!</div>
+      <div style="margin:1rem 0;font-size:1.1rem;color:var(--muted)">
+        ${a?.winner
+          ? `<span style="color:var(--gold);font-family:'Bebas Neue',sans-serif;font-size:1.5rem">${esc(a.winner)}</span> won <strong>${esc(a.character?.name||'')}</strong> for <span style="color:var(--green)">$${(a.final_amount||0).toLocaleString()}</span>`
+          : `<strong>${esc(a?.character?.name||'')}</strong>`
+        }
+      </div>
+      ${isHost ? `<button class="btn-spin" onclick="sendAction('next_round')" style="font-size:1.2rem;padding:0.7rem 2rem">▶ NEXT AUCTION</button>` : '<div class="spectator-notice">Waiting for host to start the next round...</div>'}
+    </div>
+  `;
+}
+
+function renderLog() {
+  const logEl = document.getElementById('bid-log');
+  if (!roomState.bid_log) return;
+
+  const entries = roomState.bid_log;
+  logEl.innerHTML = '';
+  entries.forEach((entry, i) => {
+    const div = document.createElement('div');
+    div.className = 'log-entry' + (i === entries.length - 1 ? ' important' : '');
+    div.textContent = entry;
+    logEl.appendChild(div);
+  });
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function renderMyChars() {
+  const myPlayer = roomState.players[MY_USERNAME];
+  const el = document.getElementById('my-characters');
+  if (!myPlayer?.characters?.length) {
+    el.innerHTML = '<span style="color:var(--muted);font-size:0.85rem">None yet</span>';
+    return;
+  }
+  el.innerHTML = myPlayer.characters.map(c =>
+    `<span class="char-chip">${c.name} <span style="opacity:0.6">$${c.paid.toLocaleString()}</span></span>`
+  ).join('');
+}
+
+function renderRosterTable() {
+  if (!roomState) return;
+  const players = roomState.players;
+  const table = document.getElementById('roster-table');
+  if (!table) return;
+
+  const names = Object.keys(players);
+  if (names.length === 0) { table.innerHTML = ''; return; }
+
+  const maxChars = Math.max(...names.map(n => (players[n].characters || []).length), 0);
+
+  let html = '<thead><tr>';
+  for (const name of names) {
+    const p = players[name];
+    html += `<th>${esc(name)}<span class="roster-balance">$${p.balance.toLocaleString()}</span></th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (let row = 0; row < maxChars; row++) {
+    html += '<tr>';
+    for (const name of names) {
+      const chars = players[name].characters || [];
+      if (row < chars.length) {
+        const c = chars[row];
+        html += `<td>${esc(c.name)}<span class="roster-paid">$${c.paid.toLocaleString()}</span></td>`;
+      } else {
+        html += '<td class="empty">—</td>';
+      }
+    }
+    html += '</tr>';
+  }
+
+  if (maxChars === 0) {
+    html += '<tr><td class="empty" colspan="' + names.length + '">No characters won yet</td></tr>';
+  }
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+let hostPanelOpen = false;
+let hostSafeMap = {};
+
+function toggleHostPanel() {
+  const panel = document.getElementById('host-panel');
+  hostPanelOpen = !hostPanelOpen;
+  panel.style.display = hostPanelOpen ? '' : 'none';
+  if (hostPanelOpen) renderHostPanel();
+}
+
+function renderHostPanel() {
+  if (!roomState) return;
+  const content = document.getElementById('host-controls-content');
+  const players = roomState.players;
+  hostSafeMap = {};
+  let html = '';
+  for (const [name, pdata] of Object.entries(players)) {
+    const isMe = name === MY_USERNAME;
+    const safe = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+    hostSafeMap[safe] = name;
+    html += `
+      <div class="host-section">
+        <div class="host-section-header">${esc(name)}${isMe ? ' <span style="color:var(--muted);font-size:0.75rem">(you)</span>' : ''} — $${pdata.balance.toLocaleString()}</div>
+        <div class="host-row">
+          <label>Balance</label>
+          <input type="number" id="bal-${safe}" value="100" min="1" step="100" />
+          <button class="host-btn green" onclick="hostAdjustBalance('${safe}')">+ Add</button>
+          <button class="host-btn" onclick="hostSubtractBalance('${safe}')">- Subtract</button>
+        </div>
+        <div class="host-row">
+          <label>Character</label>
+          <input type="text" id="char-${safe}" placeholder="Name..." maxlength="50" style="width:120px" />
+          <input type="number" id="worth-${safe}" placeholder="Worth $0" min="0" step="100" style="width:100px" />
+          <button class="host-btn green" onclick="hostAddCharacter('${safe}')">+ Add</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.2rem;margin-top:0.3rem">
+          ${(pdata.characters || []).map((c, i) =>
+            `<span class="host-char-tag">${esc(c.name)}${c.worth ? ' <span style="opacity:0.6">$'+c.worth.toLocaleString()+'</span>' : ''} <button class="host-btn sm" onclick="hostRemoveCharacter('${safe}', ${i})">✕</button></span>`
+          ).join('')}
+          ${(pdata.characters || []).length === 0 ? '<span style="color:var(--muted);font-size:0.75rem">No characters</span>' : ''}
+        </div>
+      </div>
+    `;
+  }
+  content.innerHTML = html;
+}
+
+function hostAdjustBalance(safe) {
+  const input = document.getElementById('bal-' + safe);
+  const amount = parseInt(input.value) || 0;
+  if (!amount) return;
+  sendAction('host_adjust_balance', { target: hostSafeMap[safe] || safe, amount });
+}
+
+function hostSubtractBalance(safe) {
+  const input = document.getElementById('bal-' + safe);
+  const amount = parseInt(input.value) || 0;
+  if (!amount) return;
+  sendAction('host_adjust_balance', { target: hostSafeMap[safe] || safe, amount: -amount });
+}
+
+function hostAddCharacter(safe) {
+  const input = document.getElementById('char-' + safe);
+  const worthInput = document.getElementById('worth-' + safe);
+  const name = input.value.trim();
+  const worth = parseInt(worthInput.value) || 0;
+  if (!name) return;
+  input.value = '';
+  worthInput.value = '';
+  sendAction('host_add_character', { target: hostSafeMap[safe] || safe, character: name, worth });
+}
+
+function hostRemoveCharacter(safe, index) {
+  sendAction('host_remove_character', { target: hostSafeMap[safe] || safe, index });
+}
+
+function hostStartAuction() {
+  const input = document.getElementById('character-name-input');
+  const name = input?.value.trim();
+  if (!name) return;
+  input.value = '';
+  sendAction('start_auction', { character: name });
+}
+
+function quickBid(amount) {
+  sendAction('bid', { amount });
+}
+
+function submitCustomBid() {
+  const input = document.getElementById('custom-bid');
+  const amount = parseInt(input.value);
+  if (!amount || isNaN(amount)) return;
+  const inc = roomState?.settings?.bid_increment || 100;
+  const rounded = Math.floor(amount / inc) * inc;
+  sendAction('bid', { amount: rounded });
+  input.value = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('custom-bid') === document.activeElement) {
+    submitCustomBid();
+  }
+});
+
+function showToast(msg, isError = false) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.style.borderLeftColor = isError ? 'var(--red)' : 'var(--gold)';
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3200);
+}
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
