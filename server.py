@@ -323,6 +323,13 @@ async def handle_ws_message(room: dict, username: str, data: dict):
             })
             return
 
+        if auction["current_bidder"] == username:
+            await room["connections"][username].send_json({
+                "type": "error",
+                "message": "You are already the highest bidder! Bidding higher on your own character is not allowed.",
+            })
+            return
+
         # Extend timer if bid placed near end
         extender = room.get("time_extender", TIME_EXTENDER)
         now = time.time()

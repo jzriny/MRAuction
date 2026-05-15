@@ -812,7 +812,8 @@ function renderBidding(stage) {
         <button class="bid-submit" onclick="submitCustomBid()" ${!canAfford ? 'disabled' : ''}>BID</button>
       </div>
 
-      ${isLeader ? '<div style="color:var(--green);font-size:0.85rem;font-weight:700;margin-top:0.5rem">✅ You are the highest bidder!</div>' : ''}
+       ${isLeader ? '<div style="color:var(--green);font-size:0.85rem;font-weight:700;margin-top:0.5rem">✅ You are the highest bidder!</div>' : ''}
+      <div id="bid-warning" style="display:none;color:var(--red);font-size:0.9rem;font-weight:600;margin-top:0.5rem;text-align:center;background:rgba(227,0,15,0.15);padding:0.4rem;border-radius:3px;border:1px solid var(--red);"></div>
     </div>
   `;
 
@@ -1014,7 +1015,8 @@ function hostStartAuction() {
 }
 
 function quickBid(amount) {
-  sendAction('bid', { amount });
+  const warning = attemptBid(amount, 'quick');
+  if (!warning) sendAction('bid', { amount });
 }
 
 function submitCustomBid() {
@@ -1023,8 +1025,47 @@ function submitCustomBid() {
   if (!amount || isNaN(amount)) return;
   const inc = roomState?.settings?.bid_increment || 100;
   const rounded = Math.floor(amount / inc) * inc;
-  sendAction('bid', { amount: rounded });
+  const warning = attemptBid(rounded, 'custom', input);
+  if (!warning) {
+    sendAction('bid', { amount: rounded });
+  }
   input.value = '';
+}
+
+function attemptBid(amount, source, inputElement = null) {
+  if (!roomState || roomState.players[MY_USERNAME]?.characters.length === 0) return false;
+  
+  // Get current bids
+  const bids = roomState.auction?.current_bid || 0;
+  const bidInc = roomState.settings?.bid_increment || 100;
+  const minBid = bids + bidInc;
+  
+  // If the bid is below or equal to current bid, it's allowed
+  if (amount <= bids) return false;
+  
+  // Check if this would be the highest bid (no one else bid above it)
+  const wouldBeHigher = amount < Math.max(bids + bidInc, (roomState.last_bid_amount || 0) + bidInc + 1);
+  
+  if (wouldBeHigher) {
+    const warningEl = document.getElementById('bid-warning');
+    if (warningEl) {
+      if (source === 'quick') {
+        warningEl.textContent = '⚠️ Cannot bid higher than your current amount!';
+        warningEl.style.display = 'block';
+      } else if (source === 'custom' && inputElement) {
+        const prev = inputElement.style.display;
+        inputElement.style.display = 'none';
+        warningEl.textContent = '⚠️ Cannot bid higher than your current amount!';
+        warningEl.style.display = 'block';
+        setTimeout(() => {
+          inputElement.style.display = prev;
+          warningEl.style.display = 'none';
+        }, 3000);
+      }
+    }
+    return true;
+  }
+  return false;
 }
 
 document.addEventListener('keydown', e => {
