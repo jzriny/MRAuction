@@ -22,6 +22,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 STARTING_BALANCE = 10000
 BID_INCREMENT = 100
 AUCTION_DURATION = 30  # seconds
+TIME_EXTENDER = 10  # seconds added when bid placed near end
 ROOM_CODE_LENGTH = 6
 
 # ─── In-Memory State ────────────────────────────────────────────────────────────
@@ -75,6 +76,8 @@ def room_public_state(room: dict, viewer: str = None) -> dict:
             "starting_balance": room.get("starting_balance", STARTING_BALANCE),
             "bid_increment": room.get("bid_increment", BID_INCREMENT),
             "max_players": room.get("max_players", 20),
+            "auction_duration": room.get("auction_duration", AUCTION_DURATION),
+            "time_extender": room.get("time_extender", TIME_EXTENDER),
         },
     }
 
@@ -144,6 +147,8 @@ class CreateRoomRequest(BaseModel):
     starting_balance: int = 10000
     bid_increment: int = 100
     max_players: int = 20
+    auction_duration: int = 30
+    time_extender: int = 10
 
 
 class JoinRoomRequest(BaseModel):
@@ -160,6 +165,8 @@ async def create_room(req: CreateRoomRequest):
     starting_balance = max(100, req.starting_balance)
     bid_increment = max(10, req.bid_increment)
     max_players = max(2, min(100, req.max_players))
+    auction_duration = max(10, min(300, req.auction_duration))
+    time_extender = max(0, min(60, req.time_extender))
 
     code = make_room_code()
     while code in rooms:
@@ -171,6 +178,8 @@ async def create_room(req: CreateRoomRequest):
         "starting_balance": starting_balance,
         "bid_increment": bid_increment,
         "max_players": max_players,
+        "auction_duration": auction_duration,
+        "time_extender": time_extender,
         "players": {
             username: {"balance": starting_balance, "characters": [], "connected": False}
         },
@@ -244,8 +253,11 @@ async def websocket_endpoint(ws: WebSocket, room_code: str, username: str):
             data = await ws.receive_json()
             await handle_ws_message(room, username, data)
     except WebSocketDisconnect:
-        room["players"][username]["connected"] = False
+        if username in room["players"]:
+            room["players"][username]["connected"] = False
         room["connections"].pop(username, None)
+        if username not in room["players"]:
+            return  # player was already removed by host
         await broadcast(room, {
             "type": "state_update",
             "room": room_public_state(room),
@@ -265,7 +277,8 @@ async def handle_ws_message(room: dict, username: str, data: dict):
         if not character_name:
             return
 
-        end_time = time.time() + AUCTION_DURATION
+        duration = room.get("auction_duration", AUCTION_DURATION)
+        end_time = time.time() + duration
         room["auction"] = {
             "character": {"name": character_name},
             "current_bid": 0,
@@ -282,7 +295,7 @@ async def handle_ws_message(room: dict, username: str, data: dict):
         await broadcast(room, {
             "type": "state_update",
             "room": room_public_state(room),
-            "toast": f"🔨 Auction started for {character_name}! {AUCTION_DURATION}s on the clock!",
+            "toast": f"🔨 Auction started for {character_name}! {duration}s on the clock!",
         })
 
     # ── Any player: place a bid ─────────────────────────────────────────────────
@@ -310,10 +323,11 @@ async def handle_ws_message(room: dict, username: str, data: dict):
             })
             return
 
-        # Extend timer if bid placed in last 10 seconds
+        # Extend timer if bid placed near end
+        extender = room.get("time_extender", TIME_EXTENDER)
         now = time.time()
-        if auction["end_time"] - now < 10:
-            auction["end_time"] = now + 10
+        if extender > 0 and auction["end_time"] - now < extender:
+            auction["end_time"] = now + extender
 
         auction["current_bid"] = amount
         auction["current_bidder"] = username
@@ -373,6 +387,27 @@ async def handle_ws_message(room: dict, username: str, data: dict):
                 "toast": entry,
             })
 
+    # ── Host: remove a player from the game ──────────────────────────────────────
+    elif action == "host_remove_player" and is_host:
+        target = data.get("target")
+        if target == username:
+            return
+        if target in room["players"]:
+            if target in room["connections"]:
+                try:
+                    await room["connections"][target].close(code=1000)
+                except Exception:
+                    pass
+                del room["connections"][target]
+            del room["players"][target]
+            entry = f"🛠️ {username} removed {target} from the game"
+            room["bid_log"].append(entry)
+            await broadcast(room, {
+                "type": "state_update",
+                "room": room_public_state(room),
+                "toast": entry,
+            })
+
     # ── Host: remove a character from a player ───────────────────────────────────
     elif action == "host_remove_character" and is_host:
         target = data.get("target")
@@ -410,6 +445,8 @@ async def _auction_countdown(room_code: str, end_time: float):
 
 
 # ─── Dev entry point ────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+# if __name__ == "__main__":
+    #    import uvicorn
+    #port = int(os.environ.get("PORT", 8000))
+    #
+    #uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
